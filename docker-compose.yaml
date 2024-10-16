@@ -1,0 +1,42 @@
+# docker-compose.yaml
+version: "3"
+
+services:
+  langserve:
+    build: 
+       context: .
+       dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"     # allow a direct connection from container to the local machine
+    ports:
+      - "8080:8080"
+    depends_on:
+      - vllm
+    networks:
+      - langserve
+  vllm:
+    ports:
+      - "8000:8000" 
+    ipc: host
+    volumes:
+      - ~/Meta-Llama-3.1-8B-Instruct-awq:/home/app/Meta-Llama-3.1-8B-Instruct-awq
+    image: vllm/vllm-openai:latest
+    command: ["--model","/home/app/Meta-Llama-3.1-8B-Instruct-awq",
+            "--max_model_len", "121584",
+            "--dtype", "float16",
+            "--quantization", "awq_marlin",
+            "--served-model-name", "llama",
+            "--guided-decoding-backend", "lm-format-enforcer",
+            "--disable-log-requests"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0']
+            capabilities: [gpu]
+    networks:
+      - langserve
+networks:
+  langserve:
+    driver: bridge
